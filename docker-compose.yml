@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  localstack:
+    image: localstack/localstack:latest
+    environment:
+      - SERVICES=lambda,iam,logs,cloudwatch
+      - EDGE_PORT=4566
+      - AWS_DEFAULT_REGION=sa-east-1
+      # Executor "local" roda a Lambda dentro do próprio contêiner do LocalStack
+      - LAMBDA_EXECUTOR=local
+    ports:
+      - "4566:4566"

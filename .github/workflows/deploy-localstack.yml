@@ -1,0 +1,52 @@
+jobs:
+  local-deploy-invoke:
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: lambda,iam,logs,cloudwatch
+          EDGE_PORT: 4566
+          AWS_DEFAULT_REGION: sa-east-1
+          LAMBDA_EXECUTOR: local
+        options: >-
+          --health-cmd="curl -s http://localhost:4566/_localstack/health | grep '\"initialized\": true'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    env:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: sa-east-1
+
+      EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+      EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      CUSTOMER_SERVICE_URL: ""
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: |
+          npm i -g serverless
+          npm i -D serverless-localstack
+          pip install awscli-local jq
+
+      - run: |
+          serverless deploy --stage local --region sa-east-1
+
+      - run: |
+          FN=$(awslocal lambda list-functions | jq -r '.Functions[0].FunctionName')
+          awslocal lambda invoke --function-name "$FN" --payload fileb://event-sqs.json out.json
+          cat out.json
