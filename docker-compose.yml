@@ -1,12 +1,18 @@
-version: "3.8"
+version: "3.9"
 services:
-  localstack:
-    image: localstack/localstack:latest
-    environment:
-      - SERVICES=lambda,iam,logs,cloudwatch
-      - EDGE_PORT=4566
-      - AWS_DEFAULT_REGION=sa-east-1
-      # Executor "local" roda a Lambda dentro do próprio contêiner do LocalStack
-      - LAMBDA_EXECUTOR=local
-    ports:
-      - "4566:4566"
+  email-notifier:
+    build: .
+    container_name: email-notifier
+    ports: ["8001:8001"]
+    env_file: .env
+    networks: [video]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8001)); s.close()"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  video:
+    external: true
+    name: video-net
