@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 @dataclass(frozen=True)
-class Settings:
+class Settings: # pragma: no cover
     # Auth
     AUTH_SERVICE_URL: str = os.getenv("AUTH_SERVICE_URL", "http://clientservice-web:8000")
     AUTH_TIMEOUT: float = float(os.getenv("AUTH_TIMEOUT", "4"))

@@ -1,0 +1,99 @@
+# -----------------------------------------------------------------------------
+# Padrões básicos de Python
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+*.dist-info/
+
+# Binários do Python
+python
+
+# Caches de distribuição ou build
+build/
+dist/
+wheels/
+*.spec
+
+# -----------------------------------------------------------------------------
+# Virtual Environments
+# -----------------------------------------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+.venv-*/
+
+# Poetry virtualenvs (opcional se estiver usando Poetry)
+.pvenv/
+
+# -----------------------------------------------------------------------------
+# Logs e arquivos temporários
+# -----------------------------------------------------------------------------
+*.log
+*.cache
+*.pid
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# -----------------------------------------------------------------------------
+# Arquivos de configuração e chaves sensíveis
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example  # se quiser manter um arquivo de exemplo de env no repo
+
+# -----------------------------------------------------------------------------
+# Ferramentas de controle de qualidade/cobertura de testes
+# -----------------------------------------------------------------------------
+.coverage
+.coverage.*
+.cache/
+pytest_cache/
+htmlcov/
+
+# -----------------------------------------------------------------------------
+# IDEs e editores
+# -----------------------------------------------------------------------------
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime
+*.sublime-workspace
+*.sublime-project
+
+# -----------------------------------------------------------------------------
+# Docker
+# -----------------------------------------------------------------------------
+docker-compose.override.yml
+.dockerignore
+
+# -----------------------------------------------------------------------------
+# Arquivos específicos para FastAPI (opcional)
+# -----------------------------------------------------------------------------
+# Se você gera documentação em HTML ou usa auto-geração:
+docs_build/
+docs/_build/
+
+# Se você usar Gunicorn para rodar em produção, possivelmente ignore arquivos de PID:
+gunicorn.pid
+
+# Qualquer pasta ou arquivo estático gerado que não queira versionar
+#static/
+#templates_compiled/
+
+# -----------------------------------------------------------------------------
+# Outros
+# -----------------------------------------------------------------------------
+# Se houver pastas específicas da sua estrutura FastAPI que não devem ser versionadas, adicione aqui.
+.idea
+idea/
+workspace.xml
