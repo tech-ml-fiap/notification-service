@@ -1,9 +1,45 @@
 services:
+  dd-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: dd-agent-notification-service
+    restart: unless-stopped
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=datadoghq.com
+      - DD_ENV=dev
+      - DD_APM_ENABLED=true
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_CONTAINER_LABELS_AS_TAGS={"com.docker.compose.service":"service","com.docker.compose.project":"project"}
+    ports:
+      - "8126:8126"
+      - "8125:8125/udp"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks: [video]
+
   email-notifier:
     build: .
+    labels:
+      com.datadoghq.ad.logs: >-
+        [{"source":"python","service":"email-notifier"}]
     container_name: email-notifier
     ports: ["8001:8001"]
     env_file: .env
+    environment:
+      - DD_SERVICE=email-notifier
+      - DD_ENV=dev
+      - DD_VERSION=1.0.0
+      - DD_AGENT_HOST=dd-agent
+      - DD_TRACE_AGENT_PORT=8126
+    command: >
+      ddtrace-run uvicorn main:app --host 0.0.0.0 --port 8001
+    depends_on:
+      - dd-agent
     networks: [video]
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8001)); s.close()"]
