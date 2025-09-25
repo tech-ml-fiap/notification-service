@@ -9,6 +9,9 @@ services:
       - DD_ENV=dev
       - DD_APM_ENABLED=true
       - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_CONTAINER_LABELS_AS_TAGS={"com.docker.compose.service":"service","com.docker.compose.project":"project"}
     ports:
       - "8126:8126"
       - "8125:8125/udp"
@@ -21,6 +24,9 @@ services:
 
   email-notifier:
     build: .
+    labels:
+      com.datadoghq.ad.logs: >-
+        [{"source":"python","service":"email-notifier"}]
     container_name: email-notifier
     ports: ["8001:8001"]
     env_file: .env
@@ -30,6 +36,8 @@ services:
       - DD_VERSION=1.0.0
       - DD_AGENT_HOST=dd-agent
       - DD_TRACE_AGENT_PORT=8126
+    command: >
+      ddtrace-run uvicorn main:app --host 0.0.0.0 --port 8001
     depends_on:
       - dd-agent
     networks: [video]
