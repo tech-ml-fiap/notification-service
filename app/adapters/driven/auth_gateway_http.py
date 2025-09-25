@@ -1,4 +1,3 @@
-# app/adapters/driven/auth_gateway_http.py
 import json
 import urllib.request
 from urllib.error import HTTPError
