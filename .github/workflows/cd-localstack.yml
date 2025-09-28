@@ -103,15 +103,17 @@ jobs:
             $IMAGE_NAME:$IMAGE_TAG \
             ddtrace-run uvicorn main:app --host 0.0.0.0 --port 8001
 
-      - name: Health check
+      - name: Health check (HTTP)
         run: |
-          for i in {1..20}; do
-            if curl -fsS http://localhost:8001/ >/dev/null; then
-              echo "email-notifier UP"; break
+          set -e
+          for i in {1..30}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/docs || true)
+            if [ "$code" = "200" ]; then
+              echo "email-notifier UP (/openapi.json 200)"; exit 0
             fi
-            sleep 2
+            echo "Aguardando app... código=$code"; sleep 2
           done
-          curl -sS http://localhost:8001/ || true
+          docker logs email-notifier; exit 1
 
       - name: Package & upload artifact to S3 (LocalStack)
         env:
