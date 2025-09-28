@@ -1,0 +1,138 @@
+name: CD LocalStack Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+
+env:
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_DEFAULT_REGION: sa-east-1
+  LOCALSTACK_URL: http://localhost:4566
+  IMAGE_NAME: email-notifier
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+          - 4510-4559:4510-4559
+        env:
+          SERVICES: s3,sqs,sns
+          LS_LOG: info
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Wait LocalStack
+        run: |
+          for i in {1..30}; do
+            if curl -fsS "${LOCALSTACK_URL}/_localstack/health" | jq -e '.services.s3 == "available"' >/dev/null; then
+              echo "LocalStack OK"; break
+            fi
+            echo "Aguardando LocalStack..."; sleep 2
+          done
+
+      - name: Install AWS CLI & jq
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq unzip
+          curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+          unzip -q awscliv2.zip
+          sudo ./aws/install
+          aws --version
+
+      - name: Bootstrap infra (S3/SQS/SNS) on LocalStack
+        env:
+          AWS_ENDPOINT: ${{ env.LOCALSTACK_URL }}
+        run: |
+          set -e
+          aws --endpoint-url "$AWS_ENDPOINT" s3 mb s3://deployments-email-notifier || true
+          aws --endpoint-url "$AWS_ENDPOINT" sqs create-queue --queue-name email-events || true
+          aws --endpoint-url "$AWS_ENDPOINT" sns create-topic --name email-notifications || true
+
+      - name: Build application image
+        run: |
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+      - name: Prepare .env for container
+        run: |
+          cat > .env << 'EOF'
+          EMAIL_HOST=${{ secrets.EMAIL_HOST }}
+          EMAIL_PORT=${{ secrets.EMAIL_PORT }}
+          EMAIL_USER=${{ secrets.EMAIL_USER }}
+          EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          AUTH_SERVICE_URL=${{ secrets.AUTH_SERVICE_URL }}
+          SMTP_CONNECT_TIMEOUT=7
+          SMTP_OP_TIMEOUT=10
+          SMTP_MAX_RETRIES=3
+          DD_API_KEY=${{ secrets.DD_API_KEY }}
+          EOF
+          sed -n '1,50p' .env
+
+      - name: Create external network (video-net)
+        run: |
+          docker network create video-net || true
+          docker network ls
+
+      - name: Launch stack (dd-agent + email-notifier)
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+        run: |
+          # Sobe o Datadog Agent e o serviço (Datadog usará uma key fake em demo)
+          docker compose up -d
+          # Garante que a imagem construída está sendo usada
+          docker stop email-notifier || true
+          docker rm email-notifier || true
+          docker run -d --name email-notifier \
+            --network video-net \
+            --env-file .env \
+            -p 8001:8001 \
+            -e DD_SERVICE=email-notifier \
+            -e DD_ENV=dev \
+            -e DD_VERSION=1.0.0 \
+            -e DD_AGENT_HOST=dd-agent \
+            -e DD_TRACE_AGENT_PORT=8126 \
+            $IMAGE_NAME:$IMAGE_TAG \
+            ddtrace-run uvicorn main:app --host 0.0.0.0 --port 8001
+
+      - name: Health check
+        run: |
+          for i in {1..20}; do
+            if curl -fsS http://localhost:8001/ >/dev/null; then
+              echo "email-notifier UP"; break
+            fi
+            sleep 2
+          done
+          curl -sS http://localhost:8001/ || true
+
+      - name: Package & upload artifact to S3 (LocalStack)
+        env:
+          AWS_ENDPOINT: ${{ env.LOCALSTACK_URL }}
+        run: |
+          zip -qr app-${{ github.sha }}.zip .
+          aws --endpoint-url "$AWS_ENDPOINT" s3 cp app-${{ github.sha }}.zip s3://deployments-email-notifier/artifacts/app-${{ github.sha }}.zip
+          aws --endpoint-url "$AWS_ENDPOINT" s3 ls s3://deployments-email-notifier/artifacts/
+
+      - name: Export logs
+        run: |
+          docker logs email-notifier > email-notifier.log || true
+          docker logs dd-agent-notification-service > dd-agent.log || true
+
+      - name: Upload run logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-localstack-logs
+          path: |
+            email-notifier.log
+            dd-agent.log
